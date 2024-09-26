@@ -20,3 +20,16 @@ def LoadDocuments(doc_directory, chunk_size=1024, chunk_overlap=512):
     
     texts = [doc.page_content for doc in splitted_docs]
     return texts
+
+def RemoveDuplicates(docs):
+    seen_texts = set()
+    unique_docs = []
+    
+    for doc in docs:
+        normalized_text = doc.page_content.strip().lower()
+        
+        if normalized_text not in seen_texts:
+            unique_docs.append(doc)
+            seen_texts.add(normalized_text)
+    
+    return unique_docs
