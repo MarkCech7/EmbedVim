@@ -1,3 +1,4 @@
+"""
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
@@ -33,3 +34,5 @@ def RemoveDuplicates(docs):
             seen_texts.add(normalized_text)
     
     return unique_docs
+    
+"""
