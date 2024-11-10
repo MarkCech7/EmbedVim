@@ -104,15 +104,8 @@ def upload_documents():
         return jsonify({'error': 'No valid documents to process'}), 400
 
     try:
-        new_index = VectorStoreIndex.from_documents(
-            new_documents,
-            storage_context=storage_context,
-            embed_model=embeddings,  
-            show_progress=True
-        )
-        
-        global index
-        index = new_index
+        for doc in new_documents:
+            index.insert(document=doc)
 
         return jsonify({
             'message': f'Successfully processed {len(processed_files)} documents',
@@ -131,8 +124,9 @@ template = (
         "-----------------------------------------\n"
         "Considering the above information, please respond to the following inquiry with detailed references:\n\n"
         "Question: {query_str}\n\n"
-        "Answer succinctly and do not mention context, or phrases such as 'According to my knowledge...'."
+        "Answer succinctly and DO NOT mention context, or phrases such as 'According to my knowledge...'."
         #"Use Tree-of-thought prompting technique."
+        "DO NOT mention REFERENCES in any response!"
     )
 
 qa_template = PromptTemplate(template)
