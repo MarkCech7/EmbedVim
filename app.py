@@ -1,4 +1,5 @@
 import os
+import chromadb
 from pathlib import Path
 from flask import Flask, request, jsonify
 from llama_index.core.query_engine import TransformQueryEngine
@@ -6,9 +7,8 @@ from llama_index.core.indices.query.query_transform import HyDEQueryTransform
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, PromptTemplate, Document
 from llama_index.vector_stores.chroma import ChromaVectorStore
-from llama_index.core import StorageContext
+from llama_index.core import StorageContext, SimpleDirectoryReader
 from llama_index.llms.ollama import Ollama
-import chromadb
 from werkzeug.utils import secure_filename
 
 model_name = os.getenv("RAG_MODEL_NAME", "llama3.2") 
@@ -81,8 +81,12 @@ def upload_file():
         filepath = save_uploaded_file(file)
         
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
+            #with open(filepath, 'r', encoding='utf-8') as f:
+            #    print(filepath)
+                #content = f.read()
+            #filepath = Path(filepath).resolve()
+            reader = SimpleDirectoryReader(input_dir=filepath)
+            content = reader.load_data()
 
             doc = Document(text=content, metadata={"filename": file.filename})
             index.insert(document=doc)
@@ -94,6 +98,8 @@ def upload_file():
             if os.path.exists(filepath):
                 os.remove(filepath)
             return jsonify({"error": f"Error processing file: {str(e)}"}), 500
+    else:
+        return jsonify({'error': 'Invalid file or no file selected'}), 400
 
 template = (
         "You are a leading expert in advanced AI and space sciences, with extensive knowledge in astronomy, space agencies, telescopes, planetary science, and cosmic exploration."
