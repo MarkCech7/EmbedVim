@@ -1,26 +1,26 @@
 import os
-from pathlib import Path
+import chromadb
 from flask import Flask, request, jsonify
 from llama_index.core.query_engine import TransformQueryEngine
 from llama_index.core.indices.query.query_transform import HyDEQueryTransform
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, PromptTemplate, Document
 from llama_index.vector_stores.chroma import ChromaVectorStore
-from llama_index.core import StorageContext
+from llama_index.core import StorageContext, SimpleDirectoryReader
 from llama_index.llms.ollama import Ollama
-import chromadb
 from werkzeug.utils import secure_filename
 
-model_name = os.getenv("RAG_MODEL_NAME", "llama3.1") 
+model_name = os.getenv("RAG_MODEL_NAME", "llama3.2") 
 db_directory = os.getenv("RAG_DB_DIRECTORY", "./chroma")
 doc_directory = os.getenv("RAG_DOC_DIRECTORY", "./documents")
-upload_folder = os.getenv("UPLOAD_FOLDER", "./uploads")
+upload_folder = os.getenv("UPLOAD_FOLDER", "uploads")
 allowed_extensions = {'txt', 'pdf', 'md', 'doc', 'docx'}
 
 os.makedirs(upload_folder, exist_ok=True)
 os.makedirs(doc_directory, exist_ok=True)
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "hello")
 app.config['UPLOAD_FOLDER'] = upload_folder
 
 def allowed_file(filename):
@@ -68,59 +68,26 @@ def initialize_index():
 index = initialize_index()
 
 @app.route('/upload', methods=['POST'])
-def upload_documents():
-    if 'documents' not in request.files:
-        return jsonify({'error': 'No file part in the request'}), 400
-    
-    files = request.files.getlist('documents')
-    if not files:
-        return jsonify({'error': 'No files selected'}), 400
+def upload_file():     
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
 
-    processed_files = []
-    new_documents = []
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
 
-    for file in files:
-        if file.filename == '':
-            continue
-
-        try:
-            filepath = save_uploaded_file(file)
-            if filepath is None:
-                continue
-
-            with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
-
-            doc = Document(text=content, metadata={"filename": file.filename})
-            new_documents.append(doc)
-            processed_files.append(file.filename)
-
-            os.remove(filepath)
-
-        except Exception as e:
-            return jsonify({'error': f'Error processing file {file.filename}: {str(e)}'}), 500
-
-    if not new_documents:
-        return jsonify({'error': 'No valid documents to process'}), 400
-
-    try:
-        new_index = VectorStoreIndex.from_documents(
-            new_documents,
-            storage_context=storage_context,
-            embed_model=embeddings,  
-            show_progress=True
-        )
+    filepath = save_uploaded_file(file)
+    print(filepath)
         
-        global index
-        index = new_index
-
-        return jsonify({
-            'message': f'Successfully processed {len(processed_files)} documents',
-            'processed_files': processed_files
-        })
-
+    try:
+        reader = SimpleDirectoryReader(input_files=[(filepath)])
+        content = reader.load_data()
+        index.insert(document=content[0])
+            
+        return jsonify({"message": "File successfully processed"}), 200
+            
     except Exception as e:
-        return jsonify({'error': f'Error updating index: {str(e)}'}), 500
+            return jsonify({"error": f"Error processing file: {str(e)}"}), 500
 
 template = (
         "You are a leading expert in advanced AI and space sciences, with extensive knowledge in astronomy, space agencies, telescopes, planetary science, and cosmic exploration."
@@ -131,8 +98,11 @@ template = (
         "-----------------------------------------\n"
         "Considering the above information, please respond to the following inquiry with detailed references:\n\n"
         "Question: {query_str}\n\n"
-        "Answer succinctly and do not mention context, or phrases such as 'According to my knowledge...'."
+        "Answer succinctly and DO NOT mention context, or phrases such as 'According to my knowledge...'."
         #"Use Tree-of-thought prompting technique."
+        "DO NOT mention REFERENCES in any response!"
+        "DO NOT use prior knowledge!"
+        "DO NOT answer questions from non-related topics!"
     )
 
 qa_template = PromptTemplate(template)
