@@ -1,6 +1,5 @@
 import os
 import chromadb
-from pathlib import Path
 from flask import Flask, request, jsonify
 from llama_index.core.query_engine import TransformQueryEngine
 from llama_index.core.indices.query.query_transform import HyDEQueryTransform
@@ -14,7 +13,7 @@ from werkzeug.utils import secure_filename
 model_name = os.getenv("RAG_MODEL_NAME", "llama3.2") 
 db_directory = os.getenv("RAG_DB_DIRECTORY", "./chroma")
 doc_directory = os.getenv("RAG_DOC_DIRECTORY", "./documents")
-upload_folder = os.getenv("UPLOAD_FOLDER", "./uploads")
+upload_folder = os.getenv("UPLOAD_FOLDER", "uploads")
 allowed_extensions = {'txt', 'pdf', 'md', 'doc', 'docx'}
 
 os.makedirs(upload_folder, exist_ok=True)
@@ -77,29 +76,18 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    if file and allowed_file(file.filename):
-        filepath = save_uploaded_file(file)
+    filepath = save_uploaded_file(file)
+    print(filepath)
         
-        try:
-            #with open(filepath, 'r', encoding='utf-8') as f:
-            #    print(filepath)
-                #content = f.read()
-            #filepath = Path(filepath).resolve()
-            reader = SimpleDirectoryReader(input_dir=filepath)
-            content = reader.load_data()
-
-            doc = Document(text=content, metadata={"filename": file.filename})
-            index.insert(document=doc)
+    try:
+        reader = SimpleDirectoryReader(input_files=[(filepath)])
+        content = reader.load_data()
+        index.insert(document=content[0])
             
-            os.remove(filepath)
-            return jsonify({"message": "File successfully processed"}), 200
+        return jsonify({"message": "File successfully processed"}), 200
             
-        except Exception as e:
-            if os.path.exists(filepath):
-                os.remove(filepath)
+    except Exception as e:
             return jsonify({"error": f"Error processing file: {str(e)}"}), 500
-    else:
-        return jsonify({'error': 'Invalid file or no file selected'}), 400
 
 template = (
         "You are a leading expert in advanced AI and space sciences, with extensive knowledge in astronomy, space agencies, telescopes, planetary science, and cosmic exploration."
@@ -113,6 +101,8 @@ template = (
         "Answer succinctly and DO NOT mention context, or phrases such as 'According to my knowledge...'."
         #"Use Tree-of-thought prompting technique."
         "DO NOT mention REFERENCES in any response!"
+        "DO NOT use prior knowledge!"
+        "DO NOT answer questions from non-related topics!"
     )
 
 qa_template = PromptTemplate(template)
