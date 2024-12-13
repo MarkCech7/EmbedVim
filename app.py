@@ -1,13 +1,12 @@
 import os
 from flask import Flask, request, jsonify
-from werkzeug.utils import secure_filename
 from knowledgebase import KnowledgeBase
+from file import save_uploaded_file
 
 model_name = os.getenv("RAG_MODEL_NAME", "llama3.2") 
 db_directory = os.getenv("RAG_DB_DIRECTORY", "./chroma")
 doc_directory = os.getenv("RAG_DOC_DIRECTORY", "./documents")
 upload_folder = os.getenv("UPLOAD_FOLDER", "uploads")
-allowed_extensions = {'txt', 'pdf', 'md', 'doc', 'docx'}
 
 os.makedirs(upload_folder, exist_ok=True)
 os.makedirs(doc_directory, exist_ok=True)
@@ -18,17 +17,6 @@ app.config['UPLOAD_FOLDER'] = upload_folder
 
 knowledge_base = KnowledgeBase(db_directory=db_directory,model_name=model_name)
 knowledge_base.load_from_folder(doc_directory)
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
-
-def save_uploaded_file(file):
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        return filepath
-    return None
 
 @app.route('/upload', methods=['POST'])
 def upload_file():     
