@@ -29,22 +29,22 @@ class KnowledgeBase:
         llm = Ollama(model=model_name, request_timeout=120.0)
         db = chromadb.PersistentClient(path=db_directory)
         chroma_collection = db.get_or_create_collection("quickstart")
-        vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+        self.vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         self.index  = VectorStoreIndex.from_vector_store(
-            vector_store,
+            self.vector_store,
             embed_model=embeddings,  
             show_progress=True
         )
-
+        
         qa_template = PromptTemplate(template)
-        query_engine = self.index.as_query_engine(
+        self.query_engine = self.index.as_query_engine(
             llm=llm,
             text_qa_template=qa_template,
             similarity_top_k=3
         )
 
         hyde = HyDEQueryTransform(llm=llm, include_original=True)
-        self.hyde_query_engine = TransformQueryEngine(query_engine, hyde)
+        self.hyde_query_engine = TransformQueryEngine(self.query_engine, hyde)
 
     def load_from_folder(self, doc_directory):
         reader = SimpleDirectoryReader(input_dir=doc_directory, recursive=True)
@@ -58,6 +58,11 @@ class KnowledgeBase:
         content = reader.load_data()
         self.index.insert(document=content[0])
 
-    def query(self, query):
-        response = self.hyde_query_engine.query(query)
-        return response
+    def query(self, query, hyde_enabled):
+        if hyde_enabled == True:
+            return self.hyde_query_engine.query(query)
+        
+        return self.query_engine.query(query)
+    
+    def reset(self):
+        self.vector_store.clear()
