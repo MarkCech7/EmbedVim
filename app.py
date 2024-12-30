@@ -40,8 +40,7 @@ def upload_file():
 def rag():
     data = request.get_json()
     query = data.get("query")
-    # 'true' -> True, 'false' -> False, 'None' -> False
-    hyde_param = request.args.get('hyde') #enabled
+    hyde_param = request.args.get('hyde')
     hyde_enabled = hyde_param == 'enabled' 
 
     if not query:
